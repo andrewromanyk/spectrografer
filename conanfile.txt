@@ -1,0 +1,12 @@
+[requires]
+raylib/6.0
+fftw/3.3.10
+libsndfile/1.2.2
+
+[generators]
+CMakeDeps
+CMakeToolchain
+VirtualRunEnv
+
+[layout]
+cmake_layout
