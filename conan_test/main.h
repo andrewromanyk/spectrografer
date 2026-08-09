@@ -12,7 +12,7 @@
 #include <sndfile.h>
 #include "fftw.h"
 
-constexpr int FFT_WINDOW_SIZE = 2048 , FFT_STEP_SIZE = 512; // spek values
+constexpr int FFT_WINDOW_SIZE = 2048 , FFT_STEP_SIZE = 512, MAX_TEXTURE_SIZE = 16384; // spek values
 constexpr char ICON_PATH[] = "resources/icon.png";
 
 struct Audio {

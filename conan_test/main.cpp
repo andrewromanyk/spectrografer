@@ -15,6 +15,8 @@ int main() {
     InitWindow(800, 600, "Spectrografer");
     SetTargetFPS(60);
 
+    SetWindowMinSize(500, 300);
+
     Image icon = LoadImage(ICON_PATH);
         SetWindowIcon(icon);
     UnloadImage(icon);
@@ -53,6 +55,7 @@ void drawScene(const std::vector<std::vector<double>>& magnitudes, int channels,
     }
 
     BeginDrawing();
+        ClearBackground(BLACK);
 
         DrawTexturePro(
             spectogram_texture->texture, 
@@ -100,17 +103,24 @@ Audio loadAudio(const std::string& path)
 }
 
 std::vector<std::vector<std::complex<double>>> perform_full_audio_fft(const std::vector<double>& audio, int channels) {
+    std::vector<double> mono_audio;
     if (channels != 1) {
-        throw std::runtime_error("Only mono audio is supported for FFT");
+        // take first channel only for now
+        mono_audio.reserve(audio.size() / channels);
+        for (size_t i = 0; i < audio.size(); i += channels) {
+            mono_audio.push_back(audio[i]);
+        }
+    } else {
+        mono_audio = audio;
     }
 
-    size_t numWindows = (audio.size() + FFT_STEP_SIZE - 1) / FFT_STEP_SIZE; // ceil
+    size_t numWindows = (mono_audio.size() + FFT_STEP_SIZE - 1) / FFT_STEP_SIZE; // ceil
 
     std::vector<std::vector<std::complex<double>>> fftResults;
 
     for (size_t i = 0; i < numWindows; i++) {
-        auto startIdx = audio.begin() + i * FFT_STEP_SIZE;
-        auto endIdx = std::min(startIdx + FFT_WINDOW_SIZE, audio.end());
+        auto startIdx = mono_audio.begin() + i * FFT_STEP_SIZE;
+        auto endIdx = std::min(startIdx + FFT_WINDOW_SIZE, mono_audio.end());
         std::vector<std::complex<double>> window(FFT_WINDOW_SIZE, 0.0);
         std::copy(startIdx, endIdx, window.begin());
         for (size_t j = 0; j < window.size(); j++) {
@@ -139,15 +149,30 @@ std::vector<std::vector<double>> fft_to_normalized(const std::vector<std::vector
 }
 
 void draw_spectogram_texture(const std::vector<std::vector<double>>& magnitudes, const RenderTexture2D& texture) {
-    spectogram_texture = LoadRenderTexture(magnitudes.size(), FFT_WINDOW_SIZE / 2);
+    double ratio = 1;
+    int width = static_cast<int>(magnitudes.size());
+    if (magnitudes.size() > MAX_TEXTURE_SIZE) {
+        width = MAX_TEXTURE_SIZE;
+        ratio = magnitudes.size() / static_cast<double>(MAX_TEXTURE_SIZE);
+        println("Spectrogram width exceeds maximum texture size. ratio: {}", ratio);
+    }
+    
+    spectogram_texture = LoadRenderTexture(width, FFT_WINDOW_SIZE / 2);
 
     BeginTextureMode(texture);
         BeginDrawing();
             ClearBackground(BLACK);
 
-            for (size_t i = 0; i < magnitudes.size(); ++i) {
+            for (auto [column, time, time_d] = std::tuple<size_t, size_t, double>{0, 0, 0.0}; column < width; column++, time++, time_d += ratio) {
+                int time_overflow = std::floor(time_d);
                 for (size_t j = 0; j < FFT_WINDOW_SIZE / 2; ++j) {
-                    double magnitude = magnitudes[i][j];
+                    double magnitude = magnitudes[time][j];
+                    if (time_overflow > time) {
+                        for (int k = time + 1; k < time_overflow; ++k) {
+                            magnitude += magnitudes[k][j];
+                        }
+                        magnitude /= (time_overflow - time);
+                    }
 
                     Color color = 
                     (magnitude <= 0.0)  ? BLACK :
@@ -158,8 +183,9 @@ void draw_spectogram_texture(const std::vector<std::vector<double>>& magnitudes,
                     (magnitude <= 0.83) ? ColorLerp({255, 0, 0, 255}, {255, 180, 0, 255}, (magnitude - 0.67) / 0.16) :
                     ColorLerp({255, 180, 0, 255}, WHITE, (magnitude - 0.83) / 0.17);
 
-                    DrawPixel(i, j, color); // because stupid opengl framebuffer origin is bottom-left, not top-left like raylib
+                    DrawPixel(column, j, color); // because stupid opengl framebuffer origin is bottom-left, not top-left like raylib
                 }
+                time = time_overflow;
             }
         EndDrawing();
     EndTextureMode();
