@@ -12,8 +12,12 @@ std::optional<RenderTexture2D> spectogram_texture;
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 
-    InitWindow(800, 600, "Raylib Example");
+    InitWindow(800, 600, "Spectrografer");
     SetTargetFPS(60);
+
+    Image icon = LoadImage(ICON_PATH);
+        SetWindowIcon(icon);
+    UnloadImage(icon);
 
     while (!WindowShouldClose()) {
         if (IsFileDropped()) {
@@ -50,7 +54,14 @@ void drawScene(const std::vector<std::vector<double>>& magnitudes, int channels,
 
     BeginDrawing();
 
-        DrawTexturePro(spectogram_texture->texture, {0, 0, static_cast<float>(spectogram_texture->texture.width), static_cast<float>(spectogram_texture->texture.height)}, {0, 0, static_cast<float>(width - 10), static_cast<float>(height - 10)}, {10, 10}, 0.0f, WHITE);
+        DrawTexturePro(
+            spectogram_texture->texture, 
+            {0, 0, static_cast<float>(spectogram_texture->texture.width), static_cast<float>(spectogram_texture->texture.height)}, 
+            {10, 10, static_cast<float>(width - 20), static_cast<float>(height - 20)}, 
+            {0, 0}, 
+            0.0f, 
+            WHITE
+        );
 
     EndDrawing();
 }

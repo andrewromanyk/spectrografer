@@ -13,6 +13,7 @@
 #include "fftw.h"
 
 constexpr int FFT_WINDOW_SIZE = 2048 , FFT_STEP_SIZE = 512; // spek values
+constexpr char ICON_PATH[] = "resources/icon.png";
 
 struct Audio {
     int sampleRate;
