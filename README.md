@@ -26,4 +26,6 @@ Before running make sure Conan and CMake are installed on your system.
     ./run.sh # runs the generated executable (Windows)
     ```
 
+3. Drag-and-drop the audiofile you want to visualize
+
 ![Screenshot](readme/scrn.png)
