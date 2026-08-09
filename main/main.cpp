@@ -25,9 +25,9 @@ int main() {
         if (IsFileDropped()) {
             FilePathList droppedFiles = LoadDroppedFiles();
 
-            current_file_path = droppedFiles.paths[0]; // Store the first dropped file path
+            current_file_path = droppedFiles.paths[0];
 
-            UnloadDroppedFiles(droppedFiles); // Clear memory
+            UnloadDroppedFiles(droppedFiles);
 
             audio = loadAudio(current_file_path);
 
