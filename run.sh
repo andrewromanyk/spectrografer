@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./build/conan_test/Release/main.exe
+./build/main/Release/main.exe
