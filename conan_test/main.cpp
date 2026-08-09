@@ -25,9 +25,12 @@ int main() {
 
             audio = loadAudio(current_file_path);
 
-            fftResult = performFFT({audio->samples.begin(), audio->samples.end()}, audio->channels);
+            fftResult = perform_full_audio_fft({audio->samples.begin(), audio->samples.end()}, audio->channels);
 
             magnitudes = fft_to_normalized(fftResult);
+            
+            UnloadRenderTexture(*spectogram_texture);
+            spectogram_texture.reset();
         }
 
         drawScene(magnitudes, audio ? audio->channels : 0, audio ? audio->sampleRate : 0);
@@ -42,24 +45,12 @@ void drawScene(const std::vector<std::vector<double>>& magnitudes, int channels,
     size_t height = GetScreenHeight();
     
     if (!spectogram_texture && !magnitudes.empty()) {
-        spectogram_texture = LoadRenderTexture(magnitudes.size(), FFT_WINDOW_SIZE / 2);
-
-        BeginTextureMode(*spectogram_texture);
-            BeginDrawing();
-                for (size_t i = 0; i < magnitudes.size(); ++i) {
-                    for (size_t j = 0; j < magnitudes[i].size() / 2; ++j) {
-                        double magnitude = magnitudes[i][j];
-                        Color color = {static_cast<unsigned char>((1 - magnitude) * 255), 0, static_cast<unsigned char>(magnitude * 255), 255};
-                        DrawPixel(i, j, color);
-                    }
-                }
-            EndDrawing();
-        EndTextureMode();
+        draw_spectogram_texture(magnitudes, *spectogram_texture);
     }
 
     BeginDrawing();
 
-        DrawTexturePro(spectogram_texture->texture, {0, 0, static_cast<float>(spectogram_texture->texture.width), static_cast<float>(spectogram_texture->texture.height)}, {0, 0, static_cast<float>(width), static_cast<float>(height)}, {0, 0}, 0.0f, WHITE);
+        DrawTexturePro(spectogram_texture->texture, {0, 0, static_cast<float>(spectogram_texture->texture.width), static_cast<float>(spectogram_texture->texture.height)}, {0, 0, static_cast<float>(width - 10), static_cast<float>(height - 10)}, {10, 10}, 0.0f, WHITE);
 
     EndDrawing();
 }
@@ -97,16 +88,12 @@ Audio loadAudio(const std::string& path)
     return audio;
 }
 
-std::vector<std::vector<std::complex<double>>> performFFT(const std::vector<double>& audio, int channels) {
+std::vector<std::vector<std::complex<double>>> perform_full_audio_fft(const std::vector<double>& audio, int channels) {
     if (channels != 1) {
         throw std::runtime_error("Only mono audio is supported for FFT");
     }
 
-    println("Performing FFT on audio data of size: {}", audio.size());
-
     size_t numWindows = (audio.size() + FFT_STEP_SIZE - 1) / FFT_STEP_SIZE; // ceil
-
-    println("Number of FFT windows: {}", numWindows);
 
     std::vector<std::vector<std::complex<double>>> fftResults;
 
@@ -126,20 +113,43 @@ std::vector<std::vector<std::complex<double>>> performFFT(const std::vector<doub
 }
 
 std::vector<std::vector<double>> fft_to_normalized(const std::vector<std::vector<std::complex<double>>>& audio_data) {
-    std::vector<std::vector<double>> normalized;
-    
-    for (size_t i = 0; i < audio_data.size(); ++i) {
-        const auto& window = audio_data[i];
-        std::vector<double> window_normalized;
-        for (auto& sample : window) {
-            double magnitude = std::abs(sample);
-            // println("Magnitude: {}", magnitude);
-            double db = 20 * std::log10(magnitude + 1e-10); // Avoid log(0)
-            double normalized_db = (db + 100) / 100; // Normalize to [0, 1]
-            window_normalized.push_back(normalized_db);
-        }
-        normalized.push_back(window_normalized);
-    }
+    return audio_data | std::views::transform([](const auto& window) {
+        return window | std::views::take(FFT_WINDOW_SIZE / 2)
+                | std::views::transform([](const auto& sample) {
+                    return std::abs(sample) * 4 / FFT_WINDOW_SIZE;
+                })
+                | std::views::transform([](double scaled) {
+                    return 20 * std::log10(scaled + 1e-6);
+                })
+                | std::views::transform([](double db) {
+                    return (std::clamp(db, -100.0, 0.0) + 100.0) / 100.0;
+                }) | std::ranges::to<std::vector>();
+    }) | std::ranges::to<std::vector>();
+}
 
-    return normalized;
+void draw_spectogram_texture(const std::vector<std::vector<double>>& magnitudes, const RenderTexture2D& texture) {
+    spectogram_texture = LoadRenderTexture(magnitudes.size(), FFT_WINDOW_SIZE / 2);
+
+    BeginTextureMode(texture);
+        BeginDrawing();
+            ClearBackground(BLACK);
+
+            for (size_t i = 0; i < magnitudes.size(); ++i) {
+                for (size_t j = 0; j < FFT_WINDOW_SIZE / 2; ++j) {
+                    double magnitude = magnitudes[i][j];
+
+                    Color color = 
+                    (magnitude <= 0.0)  ? BLACK :
+                    (magnitude <= 0.17) ? ColorLerp(BLACK, {0, 0, 100, 255}, magnitude / 0.17) :
+                    (magnitude <= 0.33) ? ColorLerp({0, 0, 100, 255}, {120, 0, 150, 255}, (magnitude - 0.17) / 0.16) :
+                    (magnitude <= 0.50) ? ColorLerp({120, 0, 150, 255}, {220, 0, 100, 255}, (magnitude - 0.33) / 0.17) :
+                    (magnitude <= 0.67) ? ColorLerp({220, 0, 100, 255}, {255, 0, 0, 255}, (magnitude - 0.50) / 0.17) :
+                    (magnitude <= 0.83) ? ColorLerp({255, 0, 0, 255}, {255, 180, 0, 255}, (magnitude - 0.67) / 0.16) :
+                    ColorLerp({255, 180, 0, 255}, WHITE, (magnitude - 0.83) / 0.17);
+
+                    DrawPixel(i, j, color); // because stupid opengl framebuffer origin is bottom-left, not top-left like raylib
+                }
+            }
+        EndDrawing();
+    EndTextureMode();
 }

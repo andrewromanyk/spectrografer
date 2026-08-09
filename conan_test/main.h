@@ -5,12 +5,14 @@
 #include <vector>
 #include <optional>
 #include <numbers>
+#include <algorithm>
+#include <ranges>
 
 #include "raylib.h"
 #include <sndfile.h>
 #include "fftw.h"
 
-constexpr int FFT_WINDOW_SIZE = 2048, FFT_STEP_SIZE = 1024;
+constexpr int FFT_WINDOW_SIZE = 2048 , FFT_STEP_SIZE = 512; // spek values
 
 struct Audio {
     int sampleRate;
@@ -21,9 +23,10 @@ struct Audio {
 };
 
 
+void draw_spectogram_texture(const std::vector<std::vector<double>>& magnitudes, const RenderTexture2D& texture);
 void drawScene(const std::vector<std::vector<double>>& magnitudes, int channels, int sampleRate);
 
 Audio loadAudio(const std::string&);
 
-std::vector<std::vector<std::complex<double>>> performFFT(const std::vector<double>&, int);
+std::vector<std::vector<std::complex<double>>> perform_full_audio_fft(const std::vector<double>&, int);
 std::vector<std::vector<double>> fft_to_normalized(const std::vector<std::vector<std::complex<double>>>&);

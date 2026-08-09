@@ -15,6 +15,6 @@ std::vector<std::complex<double>> fftw_transform(const std::vector<std::complex<
 
     // Clean up
     fftw_destroy_plan(plan);
-
+ 
     return output;
 }
