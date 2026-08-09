@@ -15,7 +15,7 @@ A spectogram visualization tool built with C++23.
 
 ## How to run
 
-Before runing make sure Conan and CMake are installed on your system.
+Before running make sure Conan and CMake are installed on your system.
 
 1. Clone the repository
 2. Run dependency install, build and run scripts:
