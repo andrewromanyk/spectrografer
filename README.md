@@ -8,7 +8,7 @@ A spectogram visualization tool built with C++23.
 ## Dependencies
 
 1. Conan - Dependency Manager
-2. CMake - <small>meta</small> Build System
+2. CMake - (Meta-)Build System
 3. raylib - Graphics handler
 4. fftw - Fast Fourier Transform implementation
 5. libsndfile - Audiofiles handler
