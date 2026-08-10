@@ -5,13 +5,16 @@ A spectogram visualization tool built with C++23.
 > [!NOTE]
 > This is a poor attempt at replicating [Spek](https://www.spek.cc/)
 
-## Dependencies
+## Tools
 
 1. Conan - Dependency Manager
 2. CMake - (Meta-)Build System
-3. raylib - Graphics handler
-4. fftw - Fast Fourier Transform implementation
-5. libsndfile - Audiofiles handler
+
+## Dependencies
+
+1. raylib - Graphics handler
+2. fftw - Fast Fourier Transform implementation
+3. libsndfile - Audiofiles handler
 
 ## How to run
 
