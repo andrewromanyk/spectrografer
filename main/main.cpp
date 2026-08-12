@@ -9,6 +9,8 @@ std::vector<std::vector<double>> magnitudes;
 
 std::optional<RenderTexture2D> spectogram_texture;
 
+Scene scene = SCENE_NONE;
+
 int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 
@@ -21,6 +23,8 @@ int main() {
         SetWindowIcon(icon);
     UnloadImage(icon);
 
+    font = GetFontDefault();
+
     while (!WindowShouldClose()) {
         if (IsFileDropped()) {
             FilePathList droppedFiles = LoadDroppedFiles();
@@ -31,12 +35,16 @@ int main() {
 
             audio = loadAudio(current_file_path);
 
-            fftResult = perform_full_audio_fft({audio->samples.begin(), audio->samples.end()}, audio->channels);
-
-            magnitudes = fft_to_normalized(fftResult);
-            
-            UnloadRenderTexture(*spectogram_texture);
-            spectogram_texture.reset();
+            if (audio.has_value()) {
+                fftResult = perform_full_audio_fft({audio->samples.begin(), audio->samples.end()}, audio->channels);
+                magnitudes = fft_to_normalized(fftResult);
+                UnloadRenderTexture(*spectogram_texture);
+                spectogram_texture.reset();
+                scene = SCENE_SPECTROGRAM;
+            }
+            else {
+                scene = SCENE_NONE;
+            }
         }
 
         drawScene(magnitudes, audio ? audio->channels : 0, audio ? audio->sampleRate : 0);
@@ -50,35 +58,44 @@ void drawScene(const std::vector<std::vector<double>>& magnitudes, int channels,
     size_t width = GetScreenWidth();
     size_t height = GetScreenHeight();
     
-    if (!spectogram_texture && !magnitudes.empty()) {
+    size_t max_frequency = sampleRate / 2;
+
+    if (scene == SCENE_SPECTROGRAM && !spectogram_texture.has_value()) {
         draw_spectogram_texture(magnitudes, *spectogram_texture);
     }
 
     BeginDrawing();
         ClearBackground(BLACK);
+        if (scene == SCENE_SPECTROGRAM) {
+            DrawTexturePro(
+                spectogram_texture->texture, 
+                {0, 0, static_cast<float>(spectogram_texture->texture.width), static_cast<float>(spectogram_texture->texture.height)}, 
+                {MARGIN_LEFT, MARGIN_TOP, static_cast<float>(width - MARGIN_LEFT - MARGIN_RIGHT), static_cast<float>(height - MARGIN_TOP - MARGIN_BOTTOM)}, 
+                {0, 0}, 
+                0.0f, 
+                WHITE
+            );
 
-        DrawTexturePro(
-            spectogram_texture->texture, 
-            {0, 0, static_cast<float>(spectogram_texture->texture.width), static_cast<float>(spectogram_texture->texture.height)}, 
-            {10, 10, static_cast<float>(width - 20), static_cast<float>(height - 20)}, 
-            {0, 0}, 
-            0.0f, 
-            WHITE
-        );
+            DrawLine(MARGIN_LEFT, MARGIN_TOP, MARGIN_LEFT, height - MARGIN_BOTTOM, WHITE);
+            DrawLine(MARGIN_LEFT, height - MARGIN_BOTTOM, width - MARGIN_RIGHT, height - MARGIN_BOTTOM, WHITE);
+
+            for (int i = 0; i*5000 <= max_frequency; i++) {
+                draw_frequency_line(i*5000, max_frequency, width, height);
+            }
+
+            draw_frequency_line(max_frequency, max_frequency, width, height);
+        }
 
     EndDrawing();
 }
 
-Audio loadAudio(const std::string& path)
+std::optional<Audio> loadAudio(const std::string& path)
 {
     SF_INFO info{};
     SNDFILE* file = sf_open(path.c_str(), SFM_READ, &info);
 
     if (!file) {
-        throw std::runtime_error(
-            "Cannot open audio file: " +
-            std::string(sf_strerror(nullptr))
-        );
+        return std::nullopt;
     }
 
     Audio audio{
@@ -146,6 +163,15 @@ std::vector<std::vector<double>> fft_to_normalized(const std::vector<std::vector
                     return (std::clamp(db, -100.0, 0.0) + 100.0) / 100.0;
                 }) | std::ranges::to<std::vector>();
     }) | std::ranges::to<std::vector>();
+}
+
+void draw_frequency_line(int frequency, int max_frequency, int width, int height) {
+    int y = (height - MARGIN_BOTTOM) - frequency * 1.0 / max_frequency * (height - MARGIN_TOP - MARGIN_BOTTOM);
+    DrawLine(MARGIN_LEFT - 3, y, MARGIN_LEFT + 3, y, WHITE);
+    std::string freq_label = freq_to_short_string(frequency);
+    auto [text_width, text_height] = MeasureTextEx(font, freq_label.c_str(), TEXT_SIZE, TEXT_SPACING);
+    println("freq_label: {}, text_width: {}, text_height: {}", freq_label, text_width, text_height);
+    DrawTextEx(font, freq_label.c_str(), {MARGIN_LEFT - text_width - TEXT_SPACING * 2, y - text_height / 2}, TEXT_SIZE, TEXT_SPACING, WHITE);
 }
 
 void draw_spectogram_texture(const std::vector<std::vector<double>>& magnitudes, const RenderTexture2D& texture) {
